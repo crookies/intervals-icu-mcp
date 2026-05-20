@@ -884,10 +884,31 @@ class ICUClient:
         Returns:
             List of Workout objects
         """
+        # The API has no GET /folders/{id}/workouts endpoint.
+        # Workouts are returned as `children` on the folder via GET /folders.
+        folders = await self.get_workout_folders(athlete_id=athlete_id)
+        for folder in folders:
+            if folder.id == folder_id:
+                return folder.children
+        return []
+
+    async def create_workout(
+        self,
+        workout_data: dict[str, Any],
+        athlete_id: str | None = None,
+    ) -> Workout:
+        """Create a new workout in the athlete's library.
+
+        Args:
+            workout_data: Workout data (name, folder_id, description, type, indoor, color, …)
+            athlete_id: Athlete ID (uses config default if not provided)
+
+        Returns:
+            Created Workout object
+        """
         athlete_id = athlete_id or self.config.intervals_icu_athlete_id
-        response = await self._request("GET", f"/athlete/{athlete_id}/folders/{folder_id}/workouts")
-        adapter = TypeAdapter(list[Workout])
-        return adapter.validate_python(response.json())
+        response = await self._request("POST", f"/athlete/{athlete_id}/workouts", json=workout_data)
+        return Workout(**response.json())
 
     # ==================== Event Write Operations ====================
 

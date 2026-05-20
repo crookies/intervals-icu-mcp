@@ -281,6 +281,7 @@ class Folder(BaseModel):
     duration_weeks: int | None = Field(None, alias="duration_weeks")
     hours_per_week_min: int | None = Field(None, alias="hours_per_week_min")
     hours_per_week_max: int | None = Field(None, alias="hours_per_week_max")
+    children: list[Workout] = Field(default_factory=list[Workout])
 
     model_config = ConfigDict(populate_by_name=True)
 

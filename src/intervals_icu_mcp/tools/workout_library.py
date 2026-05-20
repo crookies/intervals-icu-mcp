@@ -86,6 +86,88 @@ async def get_workout_library(
         )
 
 
+async def create_library_workout(
+    folder_id: Annotated[int, "ID of the folder where the workout will be stored"],
+    name: Annotated[str, "Workout name"],
+    description: Annotated[
+        str | None,
+        "Workout steps in native Intervals.icu format (their DSL). "
+        "Example: '10min Z2, 5x(3min Z4 / 2min Z2), 10min Z2'. "
+        "Can also be left empty for a named placeholder.",
+    ] = None,
+    type: Annotated[
+        str | None,
+        "Sport type: Ride, Run, Swim, Walk, Hike, VirtualRide, VirtualRun, etc.",
+    ] = None,
+    indoor: Annotated[bool | None, "True for indoor/trainer workouts"] = None,
+    color: Annotated[str | None, "Optional color hex code (e.g. '#4CAF50')"] = None,
+    ctx: Context | None = None,
+) -> str:
+    """Create a new workout in the athlete's workout library inside a specific folder.
+
+    Use this to save a structured workout so it can be reused or applied to the calendar.
+    The description field accepts the native Intervals.icu workout DSL (the same format
+    used when editing workouts on the website).
+
+    Args:
+        folder_id: Target folder ID (use icu_get_workout_library to list folders)
+        name: Workout name
+        description: Workout steps in native Intervals.icu DSL
+        type: Sport type
+        indoor: True for trainer/indoor workouts
+        color: Optional color hex code
+
+    Returns:
+        JSON string with the created workout details
+    """
+    assert ctx is not None
+    config: ICUConfig = await ctx.get_state("config")
+
+    try:
+        async with ICUClient(config) as client:
+            workout_data: dict[str, Any] = {"folder_id": folder_id, "name": name}
+            if description is not None:
+                workout_data["description"] = description
+            if type is not None:
+                workout_data["type"] = type
+            if indoor is not None:
+                workout_data["indoor"] = indoor
+            if color is not None:
+                workout_data["color"] = color
+
+            workout = await client.create_workout(workout_data)
+
+            result: dict[str, Any] = {
+                "id": workout.id,
+                "name": workout.name,
+                "folder_id": folder_id,
+            }
+            if workout.type:
+                result["type"] = workout.type
+            if workout.description:
+                result["description"] = workout.description
+            if workout.indoor is not None:
+                result["indoor"] = workout.indoor
+            if workout.color:
+                result["color"] = workout.color
+            if workout.icu_training_load:
+                result["training_load"] = workout.icu_training_load
+            if workout.moving_time:
+                result["duration_seconds"] = workout.moving_time
+
+            return ResponseBuilder.build_response(
+                data=result,
+                metadata={"message": f"Workout '{workout.name}' created in folder {folder_id}"},
+            )
+
+    except ICUAPIError as e:
+        return ResponseBuilder.build_error_response(e.message, error_type="api_error")
+    except Exception as e:
+        return ResponseBuilder.build_error_response(
+            f"Unexpected error: {str(e)}", error_type="internal_error"
+        )
+
+
 async def get_workouts_in_folder(
     folder_id: Annotated[int, "Folder ID to get workouts from"],
     ctx: Context | None = None,
